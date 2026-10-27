@@ -1,0 +1,795 @@
+# 키즈노트 뷰 — 대시보드 원본 YAML 편집기에서 views: 아래 (다른 뷰들과 같은 들여쓰기) 에 붙여넣기
+# 필요: custom:button-card, vertical-stack-in-card, card-mod (이미 쓰고 계신 것)
+#       기존 button_card_templates 의 hero / info_tile / tile_gap / spacer_bottom
+#       packages/kidsnote.yaml 이 만든 엔티티
+  - title: 키즈노트
+    path: kidsnote
+    icon: mdi:teddy-bear
+    type: sections
+    max_columns: 1
+    sections:
+    - type: grid
+      column_span: 1
+      cards:
+      - type: custom:vertical-stack-in-card
+        card_mod:
+          style: |
+            /* 웜그레이 패널 — 다른 방 화면과 동일 */
+            ha-card { border-radius: 28px; overflow: hidden; border: none;
+                      background: #F5F4F1; }
+            hui-grid-card {
+              display: block;
+              padding: 0 3% 14px 3%;
+              box-sizing: border-box;
+              --grid-card-gap: 8px;
+            }
+        cards:
+        - type: custom:button-card
+          template: hero
+          entity: sensor.kidsnote_summary
+          tap_action:
+            action: none
+          hold_action:
+            action: none
+          custom_fields:
+            back:
+              card:
+                type: custom:button-card
+                show_name: false
+                show_icon: false
+                show_state: false
+                entity: sensor.kidsnote_summary
+                triggers_update:
+                - sensor.kidsnote_summary
+                tap_action:
+                  action: navigate
+                  navigation_path: '[[[ return location.pathname.replace(/\/[^\/]*$/, ''/home''); ]]]'
+                hold_action:
+                  action: none
+                custom_fields:
+                  v: |
+                    [[[ return `<div style="display:flex;align-items:center;gap:6px;font-size:13.5px;
+                                padding:8px 14px;border-radius:999px;white-space:nowrap;color:#fff;
+                                background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);
+                                -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);"><ha-icon icon="mdi:chevron-left" style="--mdc-icon-size:18px;margin-left:-4px"></ha-icon>홈</div>`; ]]]
+                styles:
+                  card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - border-radius: 999px
+                  - padding: '0'
+                  - margin: '0'
+                  - overflow: visible
+                  - cursor: pointer
+                  - width: max-content
+                  grid:
+                  - grid-template-areas: '"v"'
+                  - grid-template-columns: auto
+                  - grid-template-rows: auto
+            load:
+              card:
+                type: custom:button-card
+                show_name: false
+                show_icon: false
+                show_state: false
+                entity: sensor.kidsnote_summary
+                triggers_update:
+                - sensor.kidsnote_summary
+                tap_action:
+                  action: perform-action
+                  perform_action: script.turn_on
+                  target:
+                    entity_id: script.kidsnote_load
+                hold_action:
+                  action: none
+                custom_fields:
+                  v: |
+                    [[[
+                      const run = entity && entity.state === 'running';
+                      const icon = run ? 'mdi:loading' : 'mdi:cloud-download-outline';
+                      const spin = run ? 'animation:kn-spin 1s linear infinite;' : '';
+                      return `<style>@keyframes kn-spin{to{transform:rotate(360deg)}}</style>` + `<div style="display:flex;align-items:center;gap:6px;font-size:13.5px;
+                                padding:8px 14px;border-radius:999px;white-space:nowrap;color:#fff;
+                                background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);
+                                -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);"><ha-icon icon="${icon}" style="--mdc-icon-size:17px;${spin}"></ha-icon>${run ? '불러오는 중' : '불러오기'}</div>`;
+                    ]]]
+                styles:
+                  card:
+                  - background: none
+                  - box-shadow: none
+                  - border: none
+                  - border-radius: 999px
+                  - padding: '0'
+                  - margin: '0'
+                  - overflow: visible
+                  - cursor: pointer
+                  - width: max-content
+                  grid:
+                  - grid-template-areas: '"v"'
+                  - grid-template-columns: auto
+                  - grid-template-rows: auto
+            label: |
+              [[[ return `
+                <div style="display:flex;align-items:center;gap:7px;font-size:11px;
+                            font-weight:700;letter-spacing:1.2px;opacity:.9;">
+                  <ha-icon icon="mdi:teddy-bear" style="--mdc-icon-size:15px;color:#FFE3A3"></ha-icon>
+                  KIDSNOTE
+                </div>`; ]]]
+            title: |
+              [[[
+                const r = entity && entity.attributes.report;
+                const d = new Date();
+                const wk = '일월화수목금토'[d.getDay()];
+                return `<div style="font-size:26px;font-weight:700;letter-spacing:-.5px;line-height:1.2;">
+                          오늘의 키즈노트</div>
+                        <div style="font-size:14px;opacity:.85;margin-top:4px;">
+                          ${d.getMonth()+1}월 ${d.getDate()}일 (${wk})</div>`;
+              ]]]
+            status: |
+              [[[
+                const s = entity;
+                if (!s || ['unknown','unavailable'].includes(s.state))
+                  return `<div style="font-size:12.5px;opacity:.85;">⚪ NAS 서버 연결 없음</div>`;
+                const run = s.attributes.run || {};
+                const fmt = (iso) => { if (!iso) return ''; const t = new Date(iso);
+                  return `${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`; };
+                let dot = '#34d399', txt = `마지막 수집 ${fmt(run.last_success)}`;
+                if (s.state === 'running') { dot = '#F5B83D'; txt = `불러오는 중 ${run.progress ? '· ' + run.progress : ''}`; }
+                else if (s.state === 'error') { dot = '#f87171'; txt = `수집 오류 · ${(run.last_error || '').slice(0, 40)}`; }
+                else if (s.state === 'never') { dot = '#9ca3af'; txt = '아직 수집 전'; }
+                return `<div style="display:flex;align-items:center;gap:7px;font-size:12.5px;opacity:.92;
+                            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                          <span style="flex:none;width:7px;height:7px;border-radius:50%;background:${dot};"></span>${txt}</div>`;
+              ]]]
+          styles:
+            card:
+            - height: 230px
+            - padding: 18px 20px 20px
+            - border-radius: 28px 28px 0 0
+            - background: |
+                linear-gradient(180deg, rgba(20,14,10,.10) 0%, rgba(20,14,10,.55) 100%),
+                linear-gradient(135deg, #F2A65A 0%, #E9806E 55%, #B9637A 100%)
+            grid:
+            - grid-template-areas: '"back load" "label label" "title title" "status status"'
+            - grid-template-columns: 1fr auto
+            - grid-template-rows: auto 1fr auto auto
+            - row-gap: 6px
+            custom_fields:
+              back:
+              - justify-self: start
+              - align-self: start
+              load:
+              - justify-self: end
+              - align-self: start
+              label:
+              - justify-self: start
+              - align-self: end
+              title:
+              - justify-self: start
+              - align-self: end
+              - text-align: left
+              status:
+              - justify-self: start
+              - align-self: end
+              - max-width: 100%
+              - margin-top: 6px
+        - type: custom:button-card
+          template: tile_gap
+        - type: grid
+          columns: 1
+          square: false
+          cards:
+          - type: custom:button-card
+            entity: sensor.kidsnote_summary
+            show_name: false
+            show_icon: false
+            show_state: false
+            tap_action:
+              action: none
+            hold_action:
+              action: more-info
+            custom_fields:
+              c: |
+                [[[
+                  const esc = (t) => String(t || '').replace(/[&<>"]/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+                  const r = entity && entity.attributes.report;
+                  if (!r) return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <div style="display:flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:#252525;">
+                      <ha-icon icon="mdi:email-heart-outline" style="--mdc-icon-size:18px;color:#E9806E"></ha-icon>어린이집에서 온 편지</div>
+                    <div style="font-size:12.5px;color:#8C8D90;"></div></div>
+                    <div style="font-size:14px;color:#8C8D90;">아직 받은 알림장이 없어요. 위의 '불러오기'를 눌러 주세요.</div>`;
+                  const fb = r.is_fallback ? `<div style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;
+                      color:#B9831C;background:#FFF3D6;border-radius:999px;padding:5px 11px;margin-bottom:10px;">
+                      <ha-icon icon="mdi:information-outline" style="--mdc-icon-size:15px"></ha-icon>${esc(r.fallback_line)}</div>` : '';
+                  const life = (r.life || []).map(x => `<span style="font-size:12px;color:#5f6368;background:#F1F0EC;
+                      border-radius:999px;padding:4px 10px;white-space:nowrap;">${esc(x)}</span>`).join('');
+                  const cm = (r.comments || []).map(c => `<div style="font-size:13px;color:#5f6368;margin-top:6px;line-height:1.5;">
+                      <b style="color:#252525;font-weight:600;">${esc(c.author)}</b> ${esc(c.text)}</div>`).join('');
+                  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <div style="display:flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:#252525;">
+                      <ha-icon icon="mdi:email-heart-outline" style="--mdc-icon-size:18px;color:#E9806E"></ha-icon>어린이집에서 온 편지</div>
+                    <div style="font-size:12.5px;color:#8C8D90;">${esc(r.date_label)}</div></div>
+                    ${fb}
+                    <div style="font-size:14.5px;line-height:1.65;color:#252525;white-space:pre-wrap;word-break:keep-all;">${esc(r.text) || '(본문 없음)'}</div>
+                    ${life ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;">${life}</div>` : ''}
+                    <div style="font-size:12.5px;color:#8C8D90;margin-top:12px;">${esc(r.author)}${r.video_count ? ` · 🎬 동영상 ${r.video_count}개는 보관함에서` : ''}</div>
+                    ${cm ? `<div style="border-top:1px solid #EEECE8;margin-top:10px;padding-top:4px;">${cm}</div>` : ''}`;
+                ]]]
+            styles:
+              card:
+              - background: '#FFFFFF'
+              - box-shadow: none
+              - border: none
+              - border-radius: 20px
+              - padding: 16px 18px
+              - height: auto
+              - cursor: default
+              grid:
+              - grid-template-areas: '"c"'
+              - grid-template-columns: 1fr
+              - grid-template-rows: auto
+              custom_fields:
+                c:
+                - justify-self: stretch
+                - text-align: left
+          - type: custom:button-card
+            entity: sensor.kidsnote_page_photo_count
+            triggers_update:
+            - sensor.kidsnote_summary
+            - sensor.kidsnote_photo_count
+            show_name: false
+            show_icon: false
+            show_state: false
+            tap_action:
+              action: none
+            hold_action:
+              action: none
+            custom_fields:
+              c: |
+                [[[
+                  const pc = states['sensor.kidsnote_photo_count'];
+                  const n = Number(pc ? pc.state : 0) || 0;
+                  const r = states['sensor.kidsnote_summary'] && states['sensor.kidsnote_summary'].attributes.report;
+                  const empty = n ? '' : `<div style="font-size:14px;color:#8C8D90;margin-top:10px;">${r && r.is_fallback ? '최근 알림장에' : '오늘 알림장에'} 사진이 없어요.</div>`;
+                  return `<div style="display:flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:#252525;">
+                      <ha-icon icon="mdi:camera-outline" style="--mdc-icon-size:18px;color:#E9806E"></ha-icon>오늘의 순간
+                      <span style="font-size:12.5px;font-weight:500;color:#8C8D90;">${n ? n + '장' : ''}</span></div>${empty}`;
+                ]]]
+              prev:
+                card:
+                  type: custom:button-card
+                  entity: sensor.kidsnote_page_photo_count
+                  show_name: false
+                  show_state: false
+                  show_icon: true
+                  icon: mdi:chevron-left
+                  tap_action:
+                    action: perform-action
+                    perform_action: script.turn_on
+                    target:
+                      entity_id: script.kidsnote_photo_prev
+                  hold_action:
+                    action: none
+                  styles:
+                    card:
+                    - width: 30px
+                    - height: 30px
+                    - padding: '0'
+                    - border: none
+                    - box-shadow: none
+                    - border-radius: 50%
+                    - background: '#F1F0EC'
+                    - cursor: pointer
+                    - display: '[[[ return entity && Number(entity.attributes.page_count) > 1 ? ''block'' : ''none''; ]]]'
+                    icon:
+                    - width: 18px
+                    - color: '#5f6368'
+              pg: |
+                [[[
+                  const pages = Number(entity && entity.attributes.page_count) || 1;
+                  if (pages <= 1) return '';
+                  return `<div style="font-size:12.5px;color:#5f6368;min-width:30px;text-align:center;">${entity.attributes.page}/${pages}</div>`;
+                ]]]
+              next:
+                card:
+                  type: custom:button-card
+                  entity: sensor.kidsnote_page_photo_count
+                  show_name: false
+                  show_state: false
+                  show_icon: true
+                  icon: mdi:chevron-right
+                  tap_action:
+                    action: perform-action
+                    perform_action: script.turn_on
+                    target:
+                      entity_id: script.kidsnote_photo_next
+                  hold_action:
+                    action: none
+                  styles:
+                    card:
+                    - width: 30px
+                    - height: 30px
+                    - padding: '0'
+                    - border: none
+                    - box-shadow: none
+                    - border-radius: 50%
+                    - background: '#F1F0EC'
+                    - cursor: pointer
+                    - display: '[[[ return entity && Number(entity.attributes.page_count) > 1 ? ''block'' : ''none''; ]]]'
+                    icon:
+                    - width: 18px
+                    - color: '#5f6368'
+            styles:
+              card:
+              - background: '#FFFFFF'
+              - box-shadow: none
+              - border: none
+              - border-radius: 20px
+              - padding: 12px 14px 12px 18px
+              - height: auto
+              - cursor: default
+              grid:
+              - grid-template-areas: '"c prev pg next"'
+              - grid-template-columns: 1fr auto auto auto
+              - grid-template-rows: auto
+              - column-gap: 6px
+              - align-items: center
+              custom_fields:
+                c:
+                - justify-self: stretch
+                - text-align: left
+        - type: grid
+          columns: 3
+          square: false
+          cards:
+          - type: conditional
+            conditions:
+            - condition: numeric_state
+              entity: sensor.kidsnote_page_photo_count
+              above: 0
+            card:
+              type: custom:button-card
+              entity: image.kidsnote_photo_1
+              show_name: false
+              show_icon: false
+              show_state: false
+              tap_action:
+                action: more-info
+              hold_action:
+                action: none
+              styles:
+                card:
+                - padding: '0'
+                - border: none
+                - box-shadow: none
+                - border-radius: 14px
+                - aspect-ratio: 1 / 1
+                - background-color: '#E9E8E5'
+                - background-size: cover
+                - background-position: center
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                    : ''none''; ]]]'
+          - type: conditional
+            conditions:
+            - condition: numeric_state
+              entity: sensor.kidsnote_page_photo_count
+              above: 1
+            card:
+              type: custom:button-card
+              entity: image.kidsnote_photo_2
+              show_name: false
+              show_icon: false
+              show_state: false
+              tap_action:
+                action: more-info
+              hold_action:
+                action: none
+              styles:
+                card:
+                - padding: '0'
+                - border: none
+                - box-shadow: none
+                - border-radius: 14px
+                - aspect-ratio: 1 / 1
+                - background-color: '#E9E8E5'
+                - background-size: cover
+                - background-position: center
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                    : ''none''; ]]]'
+          - type: conditional
+            conditions:
+            - condition: numeric_state
+              entity: sensor.kidsnote_page_photo_count
+              above: 2
+            card:
+              type: custom:button-card
+              entity: image.kidsnote_photo_3
+              show_name: false
+              show_icon: false
+              show_state: false
+              tap_action:
+                action: more-info
+              hold_action:
+                action: none
+              styles:
+                card:
+                - padding: '0'
+                - border: none
+                - box-shadow: none
+                - border-radius: 14px
+                - aspect-ratio: 1 / 1
+                - background-color: '#E9E8E5'
+                - background-size: cover
+                - background-position: center
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                    : ''none''; ]]]'
+          - type: conditional
+            conditions:
+            - condition: numeric_state
+              entity: sensor.kidsnote_page_photo_count
+              above: 3
+            card:
+              type: custom:button-card
+              entity: image.kidsnote_photo_4
+              show_name: false
+              show_icon: false
+              show_state: false
+              tap_action:
+                action: more-info
+              hold_action:
+                action: none
+              styles:
+                card:
+                - padding: '0'
+                - border: none
+                - box-shadow: none
+                - border-radius: 14px
+                - aspect-ratio: 1 / 1
+                - background-color: '#E9E8E5'
+                - background-size: cover
+                - background-position: center
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                    : ''none''; ]]]'
+          - type: conditional
+            conditions:
+            - condition: numeric_state
+              entity: sensor.kidsnote_page_photo_count
+              above: 4
+            card:
+              type: custom:button-card
+              entity: image.kidsnote_photo_5
+              show_name: false
+              show_icon: false
+              show_state: false
+              tap_action:
+                action: more-info
+              hold_action:
+                action: none
+              styles:
+                card:
+                - padding: '0'
+                - border: none
+                - box-shadow: none
+                - border-radius: 14px
+                - aspect-ratio: 1 / 1
+                - background-color: '#E9E8E5'
+                - background-size: cover
+                - background-position: center
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                    : ''none''; ]]]'
+          - type: conditional
+            conditions:
+            - condition: numeric_state
+              entity: sensor.kidsnote_page_photo_count
+              above: 5
+            card:
+              type: custom:button-card
+              entity: image.kidsnote_photo_6
+              show_name: false
+              show_icon: false
+              show_state: false
+              tap_action:
+                action: more-info
+              hold_action:
+                action: none
+              styles:
+                card:
+                - padding: '0'
+                - border: none
+                - box-shadow: none
+                - border-radius: 14px
+                - aspect-ratio: 1 / 1
+                - background-color: '#E9E8E5'
+                - background-size: cover
+                - background-position: center
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                    : ''none''; ]]]'
+          - type: conditional
+            conditions:
+            - condition: numeric_state
+              entity: sensor.kidsnote_page_photo_count
+              above: 6
+            card:
+              type: custom:button-card
+              entity: image.kidsnote_photo_7
+              show_name: false
+              show_icon: false
+              show_state: false
+              tap_action:
+                action: more-info
+              hold_action:
+                action: none
+              styles:
+                card:
+                - padding: '0'
+                - border: none
+                - box-shadow: none
+                - border-radius: 14px
+                - aspect-ratio: 1 / 1
+                - background-color: '#E9E8E5'
+                - background-size: cover
+                - background-position: center
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                    : ''none''; ]]]'
+          - type: conditional
+            conditions:
+            - condition: numeric_state
+              entity: sensor.kidsnote_page_photo_count
+              above: 7
+            card:
+              type: custom:button-card
+              entity: image.kidsnote_photo_8
+              show_name: false
+              show_icon: false
+              show_state: false
+              tap_action:
+                action: more-info
+              hold_action:
+                action: none
+              styles:
+                card:
+                - padding: '0'
+                - border: none
+                - box-shadow: none
+                - border-radius: 14px
+                - aspect-ratio: 1 / 1
+                - background-color: '#E9E8E5'
+                - background-size: cover
+                - background-position: center
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                    : ''none''; ]]]'
+          - type: conditional
+            conditions:
+            - condition: numeric_state
+              entity: sensor.kidsnote_page_photo_count
+              above: 8
+            card:
+              type: custom:button-card
+              entity: image.kidsnote_photo_9
+              show_name: false
+              show_icon: false
+              show_state: false
+              tap_action:
+                action: more-info
+              hold_action:
+                action: none
+              styles:
+                card:
+                - padding: '0'
+                - border: none
+                - box-shadow: none
+                - border-radius: 14px
+                - aspect-ratio: 1 / 1
+                - background-color: '#E9E8E5'
+                - background-size: cover
+                - background-position: center
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                    : ''none''; ]]]'
+          - type: conditional
+            conditions:
+            - condition: numeric_state
+              entity: sensor.kidsnote_page_photo_count
+              above: 9
+            card:
+              type: custom:button-card
+              entity: image.kidsnote_photo_10
+              show_name: false
+              show_icon: false
+              show_state: false
+              tap_action:
+                action: more-info
+              hold_action:
+                action: none
+              styles:
+                card:
+                - padding: '0'
+                - border: none
+                - box-shadow: none
+                - border-radius: 14px
+                - aspect-ratio: 1 / 1
+                - background-color: '#E9E8E5'
+                - background-size: cover
+                - background-position: center
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                    : ''none''; ]]]'
+          - type: conditional
+            conditions:
+            - condition: numeric_state
+              entity: sensor.kidsnote_page_photo_count
+              above: 10
+            card:
+              type: custom:button-card
+              entity: image.kidsnote_photo_11
+              show_name: false
+              show_icon: false
+              show_state: false
+              tap_action:
+                action: more-info
+              hold_action:
+                action: none
+              styles:
+                card:
+                - padding: '0'
+                - border: none
+                - box-shadow: none
+                - border-radius: 14px
+                - aspect-ratio: 1 / 1
+                - background-color: '#E9E8E5'
+                - background-size: cover
+                - background-position: center
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                    : ''none''; ]]]'
+          - type: conditional
+            conditions:
+            - condition: numeric_state
+              entity: sensor.kidsnote_page_photo_count
+              above: 11
+            card:
+              type: custom:button-card
+              entity: image.kidsnote_photo_12
+              show_name: false
+              show_icon: false
+              show_state: false
+              tap_action:
+                action: more-info
+              hold_action:
+                action: none
+              styles:
+                card:
+                - padding: '0'
+                - border: none
+                - box-shadow: none
+                - border-radius: 14px
+                - aspect-ratio: 1 / 1
+                - background-color: '#E9E8E5'
+                - background-size: cover
+                - background-position: center
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                    : ''none''; ]]]'
+                - position: relative
+                custom_fields:
+                  more:
+                  - position: absolute
+                  - inset: '0'
+              custom_fields:
+                more:
+                  card:
+                    type: custom:button-card
+                    entity: sensor.kidsnote_page_photo_count
+                    show_name: false
+                    show_icon: false
+                    show_state: false
+                    tap_action:
+                      action: perform-action
+                      perform_action: script.turn_on
+                      target:
+                        entity_id: script.kidsnote_photo_next
+                    hold_action:
+                      action: none
+                    custom_fields:
+                      v: |
+                        [[[ return `+${entity ? entity.attributes.remaining : 0}`; ]]]
+                    styles:
+                      card:
+                      - width: 100%
+                      - height: 100%
+                      - padding: '0'
+                      - border: none
+                      - box-shadow: none
+                      - border-radius: 14px
+                      - background: rgba(0,0,0,.45)
+                      - cursor: pointer
+                      - display: '[[[ return entity && Number(entity.attributes.remaining) > 0 ? ''flex'' : ''none''; ]]]'
+                      grid:
+                      - grid-template-areas: '"v"'
+                      - width: 100%
+                      - height: 100%
+                      custom_fields:
+                        v:
+                        - color: '#fff'
+                        - font-size: 20px
+                        - font-weight: '700'
+                        - align-self: center
+                        - justify-self: center
+        - type: grid
+          columns: 1
+          square: false
+          cards:
+          - type: custom:button-card
+            entity: sensor.kidsnote_summary
+            show_name: false
+            show_icon: false
+            show_state: false
+            tap_action:
+              action: none
+            hold_action:
+              action: none
+            custom_fields:
+              c: |
+                [[[
+                  const esc = (t) => String(t || '').replace(/[&<>"]/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+                  const list = (entity && entity.attributes.notices) || [];
+                  const rows = list.map((n, i) => `
+                    <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;${i ? 'border-top:1px solid #EEECE8;' : ''}">
+                      <div style="flex:none;width:44px;font-size:12.5px;color:#8C8D90;padding-top:2px;">${esc(n.date_label)}</div>
+                      <div style="min-width:0;flex:1;">
+                        <div style="font-size:14.5px;font-weight:600;color:#252525;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                          ${n.is_new ? '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#E9806E;margin:0 6px 2px 0;"></span>' : ''}${esc(n.title)}</div>
+                        <div style="font-size:12.5px;color:#8C8D90;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(n.snippet)}</div>
+                      </div></div>`).join('');
+                  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+                    <div style="display:flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:#252525;">
+                      <ha-icon icon="mdi:bullhorn-outline" style="--mdc-icon-size:18px;color:#E9806E"></ha-icon>최근 공지</div>
+                    <div style="font-size:12.5px;color:#8C8D90;"></div></div>
+                    ${rows || '<div style="font-size:14px;color:#8C8D90;padding-top:8px;">공지가 없어요.</div>'}`;
+                ]]]
+            styles:
+              card:
+              - background: '#FFFFFF'
+              - box-shadow: none
+              - border: none
+              - border-radius: 20px
+              - padding: 16px 18px
+              - height: auto
+              - cursor: default
+              - padding: 14px 18px 6px
+              grid:
+              - grid-template-areas: '"c"'
+              - grid-template-columns: 1fr
+              - grid-template-rows: auto
+              custom_fields:
+                c:
+                - justify-self: stretch
+                - text-align: left
+        - type: grid
+          columns: 2
+          square: false
+          cards:
+          - type: custom:button-card
+            template: info_tile
+            entity: sensor.kidsnote_summary
+            name: 보관함
+            icon: mdi:folder-image
+            show_state: true
+            state_display: '[[[ return ''사진 · 영상 전체''; ]]]'
+            variables:
+              on_states: []
+            tap_action:
+              action: navigate
+              navigation_path: /media-browser/browser
+          - type: custom:button-card
+            template: info_tile
+            entity: sensor.kidsnote_summary
+            name: 수집 상태
+            icon: mdi:cloud-sync-outline
+            variables:
+              on_states:
+              - running
+            state_display: |
+              [[[
+                const m = {ok: '정상', running: '불러오는 중', error: '오류', never: '수집 전'};
+                return m[entity.state] || '연결 없음';
+              ]]]
+      - type: custom:button-card
+        template: spacer_bottom

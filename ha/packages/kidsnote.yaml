@@ -1,0 +1,198 @@
+# 키즈노트 (NAS 백업 서버 연동) — Home Assistant 패키지
+#
+# 설치
+#   1) 이 파일을 /config/packages/kidsnote.yaml 로 저장
+#      (configuration.yaml 에  homeassistant: packages: !include_dir_named packages  필요)
+#   2) 아래 192.168.0.10 을 NAS 내부 IP 로 모두 바꾸기 (14군데: summary·run·사진 12칸)
+#   3) secrets.yaml 에 추가:  kidsnote_run_key: "<NAS kidsnote.env 의 KIDSNOTE_RUN_KEY 와 같은 값>"
+#   4) 개발자 도구 → YAML → 설정 확인 후 HA 재시작
+#
+# 만들어지는 엔티티
+#   sensor.kidsnote_summary      상태(ok/running/error/never) + 알림장/공지 속성
+#   sensor.kidsnote_photo_count  표시 중인 알림장 사진 수(전체)
+#   sensor.kidsnote_page_photo_count  지금 페이지에 보일 칸 수
+#   input_number.kidsnote_photo_page  사진 페이지 번호
+#   image.kidsnote_photo_1 ~ 12  사진 12칸 = 한 페이지 (HA 로그인으로만 보임)
+#   script.kidsnote_load         '불러오기' 버튼
+#   script.kidsnote_photo_next / _prev  사진 페이지 넘기기
+
+rest:
+  - resource: http://192.168.0.10:8765/api/summary
+    scan_interval: 600
+    timeout: 20
+    sensor:
+      - name: kidsnote_summary
+        unique_id: kidsnote_summary
+        icon: mdi:teddy-bear
+        value_template: "{{ value_json.status }}"
+        json_attributes:
+          - report
+          - notices
+          - run
+          - generated_at
+      - name: kidsnote_photo_count
+        unique_id: kidsnote_photo_count
+        icon: mdi:image-multiple
+        value_template: "{{ (value_json.report or {}).get('photo_count', 0) }}"
+
+rest_command:
+  kidsnote_run:
+    url: http://192.168.0.10:8765/api/run
+    method: post
+    timeout: 15
+    headers:
+      X-Run-Key: !secret kidsnote_run_key
+
+input_number:
+  kidsnote_photo_page:
+    name: 키즈노트 사진 페이지
+    icon: mdi:book-open-page-variant
+    min: 1
+    max: 99
+    step: 1
+    mode: box
+
+template:
+  - sensor:
+      # 지금 페이지에 보여줄 사진 칸 수 (0~12) — 대시보드 칸 표시/숨김용
+      - name: kidsnote_page_photo_count
+        unique_id: kidsnote_page_photo_count
+        icon: mdi:image-multiple-outline
+        state: >-
+          {% set r = state_attr('sensor.kidsnote_summary','report') or {} %}
+          {% set per = r.get('per_page', 12) | int(12) %}
+          {% set total = r.get('photo_count', 0) | int(0) %}
+          {% set page = states('input_number.kidsnote_photo_page') | int(1) %}
+          {{ [0, [per, total - (page - 1) * per] | min] | max }}
+        attributes:
+          page: "{{ states('input_number.kidsnote_photo_page') | int(1) }}"
+          page_count: "{{ (state_attr('sensor.kidsnote_summary','report') or {}).get('page_count', 1) }}"
+          remaining: >-
+            {% set r = state_attr('sensor.kidsnote_summary','report') or {} %}
+            {% set per = r.get('per_page', 12) | int(12) %}
+            {{ [0, r.get('photo_count', 0) | int(0) - (states('input_number.kidsnote_photo_page') | int(1)) * per] | max }}
+  - image:
+      - name: kidsnote_photo_1
+        unique_id: kidsnote_photo_1
+        url: "http://192.168.0.10:8765/photo/1?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+      - name: kidsnote_photo_2
+        unique_id: kidsnote_photo_2
+        url: "http://192.168.0.10:8765/photo/2?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+      - name: kidsnote_photo_3
+        unique_id: kidsnote_photo_3
+        url: "http://192.168.0.10:8765/photo/3?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+      - name: kidsnote_photo_4
+        unique_id: kidsnote_photo_4
+        url: "http://192.168.0.10:8765/photo/4?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+      - name: kidsnote_photo_5
+        unique_id: kidsnote_photo_5
+        url: "http://192.168.0.10:8765/photo/5?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+      - name: kidsnote_photo_6
+        unique_id: kidsnote_photo_6
+        url: "http://192.168.0.10:8765/photo/6?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+      - name: kidsnote_photo_7
+        unique_id: kidsnote_photo_7
+        url: "http://192.168.0.10:8765/photo/7?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+      - name: kidsnote_photo_8
+        unique_id: kidsnote_photo_8
+        url: "http://192.168.0.10:8765/photo/8?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+      - name: kidsnote_photo_9
+        unique_id: kidsnote_photo_9
+        url: "http://192.168.0.10:8765/photo/9?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+      - name: kidsnote_photo_10
+        unique_id: kidsnote_photo_10
+        url: "http://192.168.0.10:8765/photo/10?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+      - name: kidsnote_photo_11
+        unique_id: kidsnote_photo_11
+        url: "http://192.168.0.10:8765/photo/11?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+      - name: kidsnote_photo_12
+        unique_id: kidsnote_photo_12
+        url: "http://192.168.0.10:8765/photo/12?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+
+script:
+  kidsnote_photo_next:
+    alias: 키즈노트 사진 다음 페이지
+    icon: mdi:chevron-right
+    mode: queued
+    sequence:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.kidsnote_photo_page
+        data:
+          value: >-
+            {% set pages = state_attr('sensor.kidsnote_page_photo_count', 'page_count') | int(1) %}
+            {% set p = states('input_number.kidsnote_photo_page') | int(1) %}
+            {{ p + 1 if p < pages else 1 }}
+  kidsnote_photo_prev:
+    alias: 키즈노트 사진 이전 페이지
+    icon: mdi:chevron-left
+    mode: queued
+    sequence:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.kidsnote_photo_page
+        data:
+          value: >-
+            {% set pages = state_attr('sensor.kidsnote_page_photo_count', 'page_count') | int(1) %}
+            {% set p = states('input_number.kidsnote_photo_page') | int(1) %}
+            {{ p - 1 if p > 1 else pages }}
+  kidsnote_load:
+    alias: 키즈노트 불러오기
+    icon: mdi:cloud-download
+    mode: single
+    sequence:
+      - action: rest_command.kidsnote_run
+        continue_on_error: true
+      - delay: 3
+      # 수집이 끝날 때까지 10초마다 상태 새로고침 (최대 15분)
+      - repeat:
+          sequence:
+            - action: homeassistant.update_entity
+              target:
+                entity_id: sensor.kidsnote_summary
+            - delay: 10
+          until:
+            - condition: template
+              value_template: >-
+                {{ not is_state('sensor.kidsnote_summary', 'running')
+                   or repeat.index >= 90 }}
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.kidsnote_summary
+
+automation:
+  - id: kidsnote_refresh_after_daily_run
+    alias: 키즈노트 매일 수집 후 새로고침
+    mode: single
+    triggers:
+      - trigger: time
+        at: "18:05:00"
+      - trigger: time
+        at: "18:20:00"
+    actions:
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.kidsnote_summary
+  - id: kidsnote_photo_page_reset
+    alias: 키즈노트 새 알림장이면 사진 1페이지로
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id: sensor.kidsnote_summary
+        attribute: report
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: template
+        value_template: >-
+          {% set new = (state_attr('sensor.kidsnote_summary','report') or {}).get('version') %}
+          {% set old = ((trigger.from_state.attributes.report or {}).get('version')
+                        if trigger.platform == 'state' and trigger.from_state else none) %}
+          {% set pages = (state_attr('sensor.kidsnote_summary','report') or {}).get('page_count', 1) | int(1) %}
+          {{ new != old or states('input_number.kidsnote_photo_page') | int(1) > pages }}
+    actions:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.kidsnote_photo_page
+        data:
+          value: 1

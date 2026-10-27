@@ -1,0 +1,22 @@
+# 시놀로지 Container Manager → 프로젝트 → 생성
+#   경로: /volume1/docker/kidsnote-backup/nas   (이 파일이 있는 폴더)
+#   이 파일을 그대로 사용
+#
+# 공유기 포트포워딩 / 역방향 프록시에 8765 를 절대 등록하지 마세요. (집 안 LAN 전용)
+services:
+  kidsnote:
+    build:
+      context: ..            # 저장소 최상위 (tools/kidsnote_fetch 를 같이 넣기 위해)
+      dockerfile: nas/Dockerfile
+    image: kidsnote-nas:latest
+    container_name: kidsnote-nas
+    restart: unless-stopped
+    env_file:
+      - kidsnote.env         # .env.example 을 복사해 만든 파일 (아이디/비번)
+    environment:
+      TZ: Asia/Seoul
+      DATA_DIR: /data
+    volumes:
+      - /volume1/kidsnote:/data   # 백업이 쌓이는 공유폴더
+    ports:
+      - "8765:8765"
