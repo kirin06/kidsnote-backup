@@ -12,12 +12,17 @@
 #   sensor.kidsnote_photo_count  표시 중인 알림장 사진 수(전체)
 #   sensor.kidsnote_page_photo_count  지금 페이지에 보일 칸 수
 #   input_number.kidsnote_photo_page  사진 페이지 번호
+#   input_datetime.kidsnote_date      달력에서 고른 날짜 (자정·수집 후·10분 뒤 오늘로 복귀)
 #   image.kidsnote_photo_1 ~ 12  사진 12칸 = 한 페이지 (HA 로그인으로만 보임)
 #   script.kidsnote_load         '불러오기' 버튼
 #   script.kidsnote_photo_next / _prev  사진 페이지 넘기기
+#   script.kidsnote_cal_prev / _next / _today  달력 이전 / 다음 / 오늘
+#   input_boolean.kidsnote_month_picker, input_number.kidsnote_picker_year  12개월 선택판
+#   script.kidsnote_picker_toggle, script.kidsnote_pick_month  선택판 열기/닫기, 월 고르기
 
 rest:
-  - resource: http://192.168.0.10:8765/api/summary
+  # 달력에서 고른 날짜를 붙여서 요청 (비어 있으면 서버가 오늘로 처리)
+  - resource_template: "http://192.168.0.10:8765/api/summary?date={{ states('input_datetime.kidsnote_date') }}"
     scan_interval: 600
     timeout: 20
     sensor:
@@ -27,6 +32,8 @@ rest:
         value_template: "{{ value_json.status }}"
         json_attributes:
           - report
+          - today
+          - calendar
           - notices
           - run
           - generated_at
@@ -43,7 +50,26 @@ rest_command:
     headers:
       X-Run-Key: !secret kidsnote_run_key
 
+input_datetime:
+  kidsnote_date:
+    name: 키즈노트 보는 날짜
+    icon: mdi:calendar
+    has_date: true
+    has_time: false
+
+input_boolean:
+  kidsnote_month_picker:
+    name: 키즈노트 12개월 선택판
+    icon: mdi:calendar-month
+
 input_number:
+  kidsnote_picker_year:
+    name: 키즈노트 선택판 연도
+    icon: mdi:calendar-range
+    min: 2015
+    max: 2040
+    step: 1
+    mode: box
   kidsnote_photo_page:
     name: 키즈노트 사진 페이지
     icon: mdi:book-open-page-variant
@@ -74,42 +100,145 @@ template:
   - image:
       - name: kidsnote_photo_1
         unique_id: kidsnote_photo_1
-        url: "http://192.168.0.10:8765/photo/1?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+        url: "http://192.168.0.10:8765/photo/1?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&date={{ states('input_datetime.kidsnote_date') }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
       - name: kidsnote_photo_2
         unique_id: kidsnote_photo_2
-        url: "http://192.168.0.10:8765/photo/2?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+        url: "http://192.168.0.10:8765/photo/2?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&date={{ states('input_datetime.kidsnote_date') }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
       - name: kidsnote_photo_3
         unique_id: kidsnote_photo_3
-        url: "http://192.168.0.10:8765/photo/3?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+        url: "http://192.168.0.10:8765/photo/3?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&date={{ states('input_datetime.kidsnote_date') }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
       - name: kidsnote_photo_4
         unique_id: kidsnote_photo_4
-        url: "http://192.168.0.10:8765/photo/4?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+        url: "http://192.168.0.10:8765/photo/4?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&date={{ states('input_datetime.kidsnote_date') }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
       - name: kidsnote_photo_5
         unique_id: kidsnote_photo_5
-        url: "http://192.168.0.10:8765/photo/5?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+        url: "http://192.168.0.10:8765/photo/5?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&date={{ states('input_datetime.kidsnote_date') }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
       - name: kidsnote_photo_6
         unique_id: kidsnote_photo_6
-        url: "http://192.168.0.10:8765/photo/6?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+        url: "http://192.168.0.10:8765/photo/6?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&date={{ states('input_datetime.kidsnote_date') }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
       - name: kidsnote_photo_7
         unique_id: kidsnote_photo_7
-        url: "http://192.168.0.10:8765/photo/7?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+        url: "http://192.168.0.10:8765/photo/7?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&date={{ states('input_datetime.kidsnote_date') }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
       - name: kidsnote_photo_8
         unique_id: kidsnote_photo_8
-        url: "http://192.168.0.10:8765/photo/8?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+        url: "http://192.168.0.10:8765/photo/8?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&date={{ states('input_datetime.kidsnote_date') }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
       - name: kidsnote_photo_9
         unique_id: kidsnote_photo_9
-        url: "http://192.168.0.10:8765/photo/9?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+        url: "http://192.168.0.10:8765/photo/9?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&date={{ states('input_datetime.kidsnote_date') }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
       - name: kidsnote_photo_10
         unique_id: kidsnote_photo_10
-        url: "http://192.168.0.10:8765/photo/10?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+        url: "http://192.168.0.10:8765/photo/10?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&date={{ states('input_datetime.kidsnote_date') }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
       - name: kidsnote_photo_11
         unique_id: kidsnote_photo_11
-        url: "http://192.168.0.10:8765/photo/11?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+        url: "http://192.168.0.10:8765/photo/11?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&date={{ states('input_datetime.kidsnote_date') }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
       - name: kidsnote_photo_12
         unique_id: kidsnote_photo_12
-        url: "http://192.168.0.10:8765/photo/12?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
+        url: "http://192.168.0.10:8765/photo/12?page={{ states('input_number.kidsnote_photo_page') | int(1) }}&date={{ states('input_datetime.kidsnote_date') }}&v={{ (state_attr('sensor.kidsnote_summary','report') or {}).get('version','0') }}"
 
 script:
+  # ‹ : 선택판이 열려 있으면 연도 -1, 아니면 이전 달 1일
+  kidsnote_cal_prev:
+    alias: 키즈노트 달력 이전
+    icon: mdi:chevron-left
+    mode: queued
+    sequence:
+      - if:
+          - condition: state
+            entity_id: input_boolean.kidsnote_month_picker
+            state: "on"
+        then:
+          - action: input_number.decrement
+            target:
+              entity_id: input_number.kidsnote_picker_year
+        else:
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.kidsnote_date
+            data:
+              date: >-
+                {% set d = states('input_datetime.kidsnote_date') | as_datetime(now()) %}
+                {% set y = d.year if d.month > 1 else d.year - 1 %}
+                {% set m = d.month - 1 if d.month > 1 else 12 %}
+                {{ '%04d-%02d-01' | format(y, m) }}
+  # › : 선택판이 열려 있으면 연도 +1, 아니면 다음 달 1일
+  kidsnote_cal_next:
+    alias: 키즈노트 달력 다음
+    icon: mdi:chevron-right
+    mode: queued
+    sequence:
+      - if:
+          - condition: state
+            entity_id: input_boolean.kidsnote_month_picker
+            state: "on"
+        then:
+          - action: input_number.increment
+            target:
+              entity_id: input_number.kidsnote_picker_year
+        else:
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.kidsnote_date
+            data:
+              date: >-
+                {% set d = states('input_datetime.kidsnote_date') | as_datetime(now()) %}
+                {% set y = d.year if d.month < 12 else d.year + 1 %}
+                {% set m = d.month + 1 if d.month < 12 else 1 %}
+                {{ '%04d-%02d-01' | format(y, m) }}
+  kidsnote_cal_today:
+    alias: 키즈노트 달력 오늘
+    icon: mdi:calendar-today
+    mode: single
+    sequence:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.kidsnote_month_picker
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.kidsnote_date
+        data:
+          date: "{{ now().date() }}"
+  # 제목(2026년 10월 ▾)을 누르면 12개월 선택판 열기/닫기
+  kidsnote_picker_toggle:
+    alias: 키즈노트 12개월 선택판 열기/닫기
+    icon: mdi:calendar-month
+    mode: single
+    sequence:
+      - if:
+          - condition: state
+            entity_id: input_boolean.kidsnote_month_picker
+            state: "off"
+        then:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.kidsnote_picker_year
+            data:
+              value: "{{ (states('input_datetime.kidsnote_date') | as_datetime(now())).year }}"
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.kidsnote_month_picker
+        else:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.kidsnote_month_picker
+  # 선택판에서 월을 누르면 그 달 1일로 이동하고 선택판 닫기
+  kidsnote_pick_month:
+    alias: 키즈노트 월 고르기
+    icon: mdi:calendar-cursor
+    mode: single
+    fields:
+      month:
+        description: 1~12
+        example: 10
+    sequence:
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.kidsnote_date
+        data:
+          date: >-
+            {{ '%04d-%02d-01' | format(states('input_number.kidsnote_picker_year') | int(now().year), month | int(1)) }}
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.kidsnote_month_picker
   kidsnote_photo_next:
     alias: 키즈노트 사진 다음 페이지
     icon: mdi:chevron-right
@@ -196,3 +325,43 @@ automation:
           entity_id: input_number.kidsnote_photo_page
         data:
           value: 1
+  # 날짜를 고르면 바로 그날 알림장으로 새로고침
+  - id: kidsnote_date_changed
+    alias: 키즈노트 날짜 바뀌면 새로고침
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_datetime.kidsnote_date
+    actions:
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.kidsnote_summary
+  # 자정 · 수집 끝난 직후 · HA 시작 · 다른 날짜를 10분 넘게 보고 있으면 → 오늘로
+  - id: kidsnote_date_back_to_today
+    alias: 키즈노트 오늘로 돌아오기
+    mode: single
+    triggers:
+      - trigger: time
+        at: "00:00:10"
+      - trigger: homeassistant
+        event: start
+      - trigger: state
+        entity_id: sensor.kidsnote_summary
+        from: running
+        to: ok
+      - trigger: template
+        value_template: "{{ states('input_datetime.kidsnote_date') != (now().date() | string) }}"
+        for:
+          minutes: 10
+    conditions:
+      - condition: template
+        value_template: "{{ states('input_datetime.kidsnote_date') != (now().date() | string) }}"
+    actions:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.kidsnote_month_picker
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.kidsnote_date
+        data:
+          date: "{{ now().date() }}"

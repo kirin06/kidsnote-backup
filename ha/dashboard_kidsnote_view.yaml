@@ -1,6 +1,7 @@
 # 키즈노트 뷰 — 대시보드 원본 YAML 편집기에서 views: 아래 (다른 뷰들과 같은 들여쓰기) 에 붙여넣기
 # 필요: custom:button-card, vertical-stack-in-card, card-mod (이미 쓰고 계신 것)
 #       기존 button_card_templates 의 hero / info_tile / tile_gap / spacer_bottom
+#       + 새 템플릿 kn_cal_cell, kn_month_cell (dashboard_kidsnote_templates.yaml)
 #       packages/kidsnote.yaml 이 만든 엔티티
   - title: 키즈노트
     path: kidsnote
@@ -23,6 +24,9 @@
               box-sizing: border-box;
               --grid-card-gap: 8px;
             }
+            /* 달력: 제목 카드 + 날짜(또는 12개월) 칸을 흰 카드 하나로 이어 붙인다 */
+            hui-grid-card:has(+ hui-conditional-card) { padding-bottom: 0; }
+            hui-conditional-card hui-grid-card { --grid-card-gap: 0px; }
         cards:
         - type: custom:button-card
           template: hero
@@ -194,27 +198,28 @@
                 [[[
                   const esc = (t) => String(t || '').replace(/[&<>"]/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
                   const r = entity && entity.attributes.report;
-                  if (!r) return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                  const items = (r && r.items) || [];
+                  const hdr = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                     <div style="display:flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:#252525;">
                       <ha-icon icon="mdi:email-heart-outline" style="--mdc-icon-size:18px;color:#E9806E"></ha-icon>어린이집에서 온 편지</div>
-                    <div style="font-size:12.5px;color:#8C8D90;"></div></div>
-                    <div style="font-size:14px;color:#8C8D90;">아직 받은 알림장이 없어요. 위의 '불러오기'를 눌러 주세요.</div>`;
+                    <div style="font-size:12.5px;color:#8C8D90;">${r ? esc(r.date_label) : ""}${items.length > 1 ? " · " + items.length + "건" : ""}</div></div>`;
+                  if (!r || !items.length) return hdr + `<div style="font-size:14px;color:#8C8D90;">${esc((r && r.fallback_line) || "아직 받은 알림장이 없어요. 위의 '불러오기'를 눌러 주세요.")}</div>`;
                   const fb = r.is_fallback ? `<div style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;
                       color:#B9831C;background:#FFF3D6;border-radius:999px;padding:5px 11px;margin-bottom:10px;">
                       <ha-icon icon="mdi:information-outline" style="--mdc-icon-size:15px"></ha-icon>${esc(r.fallback_line)}</div>` : '';
-                  const life = (r.life || []).map(x => `<span style="font-size:12px;color:#5f6368;background:#F1F0EC;
-                      border-radius:999px;padding:4px 10px;white-space:nowrap;">${esc(x)}</span>`).join('');
-                  const cm = (r.comments || []).map(c => `<div style="font-size:13px;color:#5f6368;margin-top:6px;line-height:1.5;">
-                      <b style="color:#252525;font-weight:600;">${esc(c.author)}</b> ${esc(c.text)}</div>`).join('');
-                  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                    <div style="display:flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:#252525;">
-                      <ha-icon icon="mdi:email-heart-outline" style="--mdc-icon-size:18px;color:#E9806E"></ha-icon>어린이집에서 온 편지</div>
-                    <div style="font-size:12.5px;color:#8C8D90;">${esc(r.date_label)}</div></div>
-                    ${fb}
-                    <div style="font-size:14.5px;line-height:1.65;color:#252525;white-space:pre-wrap;word-break:keep-all;">${esc(r.text) || '(본문 없음)'}</div>
-                    ${life ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;">${life}</div>` : ''}
-                    <div style="font-size:12.5px;color:#8C8D90;margin-top:12px;">${esc(r.author)}${r.video_count ? ` · 🎬 동영상 ${r.video_count}개는 보관함에서` : ''}</div>
-                    ${cm ? `<div style="border-top:1px solid #EEECE8;margin-top:10px;padding-top:4px;">${cm}</div>` : ''}`;
+                  const one = (e, i) => {
+                    const life = (e.life || []).map(x => `<span style="font-size:12px;color:#5f6368;background:#F1F0EC;
+                        border-radius:999px;padding:4px 10px;white-space:nowrap;">${esc(x)}</span>`).join('');
+                    const cm = (e.comments || []).map(c => `<div style="font-size:13px;color:#5f6368;margin-top:6px;line-height:1.5;">
+                        <b style="color:#252525;font-weight:600;">${esc(c.author)}</b> ${esc(c.text)}</div>`).join('');
+                    const top = items.length > 1 ? `<div style="font-size:12.5px;font-weight:700;color:#E9806E;margin-bottom:6px;">${esc(e.time)}</div>` : '';
+                    return `<div style="${i ? 'border-top:1px solid #EEECE8;margin-top:14px;padding-top:14px;' : ''}">${top}
+                      <div style="font-size:14.5px;line-height:1.65;color:#252525;white-space:pre-wrap;word-break:keep-all;">${esc(e.text) || '(본문 없음)'}</div>
+                      ${life ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;">${life}</div>` : ''}
+                      <div style="font-size:12.5px;color:#8C8D90;margin-top:12px;">${esc(e.author)}${e.photo_count ? ` · 사진 ${e.photo_count}장` : ''}${e.video_count ? ` · 🎬 동영상 ${e.video_count}개는 보관함에서` : ''}</div>
+                      ${cm ? `<div style="border-top:1px dashed #EEECE8;margin-top:10px;padding-top:4px;">${cm}</div>` : ''}</div>`;
+                  };
+                  return hdr + fb + items.map(one).join('');
                 ]]]
             styles:
               card:
@@ -251,10 +256,11 @@
                   const pc = states['sensor.kidsnote_photo_count'];
                   const n = Number(pc ? pc.state : 0) || 0;
                   const r = states['sensor.kidsnote_summary'] && states['sensor.kidsnote_summary'].attributes.report;
-                  const empty = n ? '' : `<div style="font-size:14px;color:#8C8D90;margin-top:10px;">${r && r.is_fallback ? '최근 알림장에' : '오늘 알림장에'} 사진이 없어요.</div>`;
-                  return `<div style="display:flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:#252525;">
-                      <ha-icon icon="mdi:camera-outline" style="--mdc-icon-size:18px;color:#E9806E"></ha-icon>오늘의 순간
-                      <span style="font-size:12.5px;font-weight:500;color:#8C8D90;">${n ? n + '장' : ''}</span></div>${empty}`;
+                  const title = r && !r.is_today ? '그날의 순간' : '오늘의 순간';
+                  const empty = n ? '' : `<div style="font-size:14px;color:#8C8D90;margin-top:10px;">${r && r.has_report ? '이날 알림장에 사진이 없어요.' : '사진이 없어요.'}</div>`;
+                  return `<div style="display:block;width:100%;text-align:left;white-space:nowrap;font-size:15px;font-weight:700;color:#252525;line-height:22px;">
+                      <ha-icon icon="mdi:camera-outline" style="display:inline-flex;--mdc-icon-size:18px;color:#E9806E;vertical-align:-3px;margin-right:7px;"></ha-icon>${title}
+                      <span style="font-size:12.5px;font-weight:500;color:#8C8D90;margin-left:6px;">${n ? n + '장' : ''}</span></div>${empty}`;
                 ]]]
               prev:
                 card:
@@ -368,7 +374,7 @@
                 - background-color: '#E9E8E5'
                 - background-size: cover
                 - background-position: center
-                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}&_=${encodeURIComponent(entity.state)}")`
                     : ''none''; ]]]'
           - type: conditional
             conditions:
@@ -395,7 +401,7 @@
                 - background-color: '#E9E8E5'
                 - background-size: cover
                 - background-position: center
-                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}&_=${encodeURIComponent(entity.state)}")`
                     : ''none''; ]]]'
           - type: conditional
             conditions:
@@ -422,7 +428,7 @@
                 - background-color: '#E9E8E5'
                 - background-size: cover
                 - background-position: center
-                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}&_=${encodeURIComponent(entity.state)}")`
                     : ''none''; ]]]'
           - type: conditional
             conditions:
@@ -449,7 +455,7 @@
                 - background-color: '#E9E8E5'
                 - background-size: cover
                 - background-position: center
-                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}&_=${encodeURIComponent(entity.state)}")`
                     : ''none''; ]]]'
           - type: conditional
             conditions:
@@ -476,7 +482,7 @@
                 - background-color: '#E9E8E5'
                 - background-size: cover
                 - background-position: center
-                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}&_=${encodeURIComponent(entity.state)}")`
                     : ''none''; ]]]'
           - type: conditional
             conditions:
@@ -503,7 +509,7 @@
                 - background-color: '#E9E8E5'
                 - background-size: cover
                 - background-position: center
-                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}&_=${encodeURIComponent(entity.state)}")`
                     : ''none''; ]]]'
           - type: conditional
             conditions:
@@ -530,7 +536,7 @@
                 - background-color: '#E9E8E5'
                 - background-size: cover
                 - background-position: center
-                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}&_=${encodeURIComponent(entity.state)}")`
                     : ''none''; ]]]'
           - type: conditional
             conditions:
@@ -557,7 +563,7 @@
                 - background-color: '#E9E8E5'
                 - background-size: cover
                 - background-position: center
-                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}&_=${encodeURIComponent(entity.state)}")`
                     : ''none''; ]]]'
           - type: conditional
             conditions:
@@ -584,7 +590,7 @@
                 - background-color: '#E9E8E5'
                 - background-size: cover
                 - background-position: center
-                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}&_=${encodeURIComponent(entity.state)}")`
                     : ''none''; ]]]'
           - type: conditional
             conditions:
@@ -611,7 +617,7 @@
                 - background-color: '#E9E8E5'
                 - background-size: cover
                 - background-position: center
-                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}&_=${encodeURIComponent(entity.state)}")`
                     : ''none''; ]]]'
           - type: conditional
             conditions:
@@ -638,7 +644,7 @@
                 - background-color: '#E9E8E5'
                 - background-size: cover
                 - background-position: center
-                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}&_=${encodeURIComponent(entity.state)}")`
                     : ''none''; ]]]'
           - type: conditional
             conditions:
@@ -665,7 +671,7 @@
                 - background-color: '#E9E8E5'
                 - background-size: cover
                 - background-position: center
-                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}")`
+                - background-image: '[[[ return entity && entity.attributes.entity_picture ? `url("${entity.attributes.entity_picture}&_=${encodeURIComponent(entity.state)}")`
                     : ''none''; ]]]'
                 - position: relative
                 custom_fields:
@@ -712,6 +718,565 @@
                         - font-weight: '700'
                         - align-self: center
                         - justify-self: center
+        - type: grid
+          columns: 1
+          square: false
+          cards:
+          - type: custom:button-card
+            entity: sensor.kidsnote_summary
+            show_name: false
+            show_icon: false
+            show_state: false
+            tap_action:
+              action: none
+            hold_action:
+              action: none
+            custom_fields:
+              c:
+                card:
+                  type: custom:button-card
+                  entity: sensor.kidsnote_summary
+                  triggers_update:
+                  - input_boolean.kidsnote_month_picker
+                  - input_number.kidsnote_picker_year
+                  show_name: false
+                  show_icon: false
+                  show_state: false
+                  tap_action:
+                    action: perform-action
+                    perform_action: script.turn_on
+                    target:
+                      entity_id: script.kidsnote_picker_toggle
+                  hold_action:
+                    action: none
+                  custom_fields:
+                    v: |
+                      [[[
+                        const cal = (entity && entity.attributes.calendar) || {};
+                        const [y, m] = (cal.month || '').split('-');
+                        const pk = states['input_boolean.kidsnote_month_picker'];
+                        const on = pk && pk.state === 'on';
+                        const py = states['input_number.kidsnote_picker_year'];
+                        const label = on ? `${py ? Math.round(Number(py.state)) : y}년` : (y ? `${y}년 ${Number(m)}월` : '달력');
+                        return `<div style="display:block;white-space:nowrap;font-size:17px;font-weight:700;color:#252525;line-height:24px;">
+                            ${label}<ha-icon icon="${on ? 'mdi:chevron-up' : 'mdi:chevron-down'}"
+                              style="display:inline-flex;--mdc-icon-size:18px;color:#E9806E;vertical-align:-3px;margin-left:3px;"></ha-icon></div>`;
+                      ]]]
+                  styles:
+                    card:
+                    - background: none
+                    - box-shadow: none
+                    - border: none
+                    - padding: '0'
+                    - cursor: pointer
+                    - width: max-content
+                    grid:
+                    - grid-template-areas: '"v"'
+                    - grid-template-columns: auto
+                    - grid-template-rows: auto
+              prev:
+                card:
+                  type: custom:button-card
+                  entity: sensor.kidsnote_summary
+                  show_name: false
+                  show_state: false
+                  show_icon: true
+                  tap_action:
+                    action: perform-action
+                    perform_action: script.turn_on
+                    target:
+                      entity_id: script.kidsnote_cal_prev
+                  hold_action:
+                    action: none
+                  styles:
+                    card:
+                    - height: 30px
+                    - padding: '0'
+                    - border: none
+                    - box-shadow: none
+                    - border-radius: 999px
+                    - background: '#F1F0EC'
+                    - cursor: pointer
+                    - width: 30px
+                    icon:
+                    - width: 18px
+                    - color: '#5f6368'
+                    name:
+                    - font-size: 12.5px
+                    - font-weight: '600'
+                    - color: '#5f6368'
+                  icon: mdi:chevron-left
+              today:
+                card:
+                  type: custom:button-card
+                  entity: sensor.kidsnote_summary
+                  show_name: true
+                  show_state: false
+                  show_icon: false
+                  tap_action:
+                    action: perform-action
+                    perform_action: script.turn_on
+                    target:
+                      entity_id: script.kidsnote_cal_today
+                  hold_action:
+                    action: none
+                  styles:
+                    card:
+                    - height: 30px
+                    - padding: 0 10px
+                    - border: none
+                    - box-shadow: none
+                    - border-radius: 999px
+                    - background: '#F1F0EC'
+                    - cursor: pointer
+                    icon:
+                    - width: 18px
+                    - color: '#5f6368'
+                    name:
+                    - font-size: 12.5px
+                    - font-weight: '600'
+                    - color: '#5f6368'
+                  name: 오늘
+              next:
+                card:
+                  type: custom:button-card
+                  entity: sensor.kidsnote_summary
+                  show_name: false
+                  show_state: false
+                  show_icon: true
+                  tap_action:
+                    action: perform-action
+                    perform_action: script.turn_on
+                    target:
+                      entity_id: script.kidsnote_cal_next
+                  hold_action:
+                    action: none
+                  styles:
+                    card:
+                    - height: 30px
+                    - padding: '0'
+                    - border: none
+                    - box-shadow: none
+                    - border-radius: 999px
+                    - background: '#F1F0EC'
+                    - cursor: pointer
+                    - width: 30px
+                    icon:
+                    - width: 18px
+                    - color: '#5f6368'
+                    name:
+                    - font-size: 12.5px
+                    - font-weight: '600'
+                    - color: '#5f6368'
+                  icon: mdi:chevron-right
+            styles:
+              card:
+              - background: '#FFFFFF'
+              - box-shadow: none
+              - border: none
+              - border-radius: 20px 20px 0 0
+              - padding: 14px 14px 8px 18px
+              - height: auto
+              - cursor: default
+              grid:
+              - grid-template-areas: '"c prev today next"'
+              - grid-template-columns: 1fr auto auto auto
+              - grid-template-rows: auto
+              - column-gap: 6px
+              - align-items: center
+              custom_fields:
+                c:
+                - justify-self: start
+        - type: conditional
+          conditions:
+          - condition: state
+            entity: input_boolean.kidsnote_month_picker
+            state_not: 'on'
+          card:
+            type: grid
+            columns: 7
+            square: false
+            cards:
+            - type: custom:button-card
+              show_name: true
+              show_icon: false
+              show_state: false
+              name: 일
+              tap_action:
+                action: none
+              hold_action:
+                action: none
+              styles:
+                card:
+                - background: '#FFFFFF'
+                - box-shadow: none
+                - border: none
+                - border-radius: '0'
+                - padding: '0'
+                - height: 24px
+                - cursor: default
+                name:
+                - font-size: 11.5px
+                - font-weight: '600'
+                - color: '#E9806E'
+            - type: custom:button-card
+              show_name: true
+              show_icon: false
+              show_state: false
+              name: 월
+              tap_action:
+                action: none
+              hold_action:
+                action: none
+              styles:
+                card:
+                - background: '#FFFFFF'
+                - box-shadow: none
+                - border: none
+                - border-radius: '0'
+                - padding: '0'
+                - height: 24px
+                - cursor: default
+                name:
+                - font-size: 11.5px
+                - font-weight: '600'
+                - color: '#8C8D90'
+            - type: custom:button-card
+              show_name: true
+              show_icon: false
+              show_state: false
+              name: 화
+              tap_action:
+                action: none
+              hold_action:
+                action: none
+              styles:
+                card:
+                - background: '#FFFFFF'
+                - box-shadow: none
+                - border: none
+                - border-radius: '0'
+                - padding: '0'
+                - height: 24px
+                - cursor: default
+                name:
+                - font-size: 11.5px
+                - font-weight: '600'
+                - color: '#8C8D90'
+            - type: custom:button-card
+              show_name: true
+              show_icon: false
+              show_state: false
+              name: 수
+              tap_action:
+                action: none
+              hold_action:
+                action: none
+              styles:
+                card:
+                - background: '#FFFFFF'
+                - box-shadow: none
+                - border: none
+                - border-radius: '0'
+                - padding: '0'
+                - height: 24px
+                - cursor: default
+                name:
+                - font-size: 11.5px
+                - font-weight: '600'
+                - color: '#8C8D90'
+            - type: custom:button-card
+              show_name: true
+              show_icon: false
+              show_state: false
+              name: 목
+              tap_action:
+                action: none
+              hold_action:
+                action: none
+              styles:
+                card:
+                - background: '#FFFFFF'
+                - box-shadow: none
+                - border: none
+                - border-radius: '0'
+                - padding: '0'
+                - height: 24px
+                - cursor: default
+                name:
+                - font-size: 11.5px
+                - font-weight: '600'
+                - color: '#8C8D90'
+            - type: custom:button-card
+              show_name: true
+              show_icon: false
+              show_state: false
+              name: 금
+              tap_action:
+                action: none
+              hold_action:
+                action: none
+              styles:
+                card:
+                - background: '#FFFFFF'
+                - box-shadow: none
+                - border: none
+                - border-radius: '0'
+                - padding: '0'
+                - height: 24px
+                - cursor: default
+                name:
+                - font-size: 11.5px
+                - font-weight: '600'
+                - color: '#8C8D90'
+            - type: custom:button-card
+              show_name: true
+              show_icon: false
+              show_state: false
+              name: 토
+              tap_action:
+                action: none
+              hold_action:
+                action: none
+              styles:
+                card:
+                - background: '#FFFFFF'
+                - box-shadow: none
+                - border: none
+                - border-radius: '0'
+                - padding: '0'
+                - height: 24px
+                - cursor: default
+                name:
+                - font-size: 11.5px
+                - font-weight: '600'
+                - color: '#8C8D90'
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 0
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 1
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 2
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 3
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 4
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 5
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 6
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 7
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 8
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 9
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 10
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 11
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 12
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 13
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 14
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 15
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 16
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 17
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 18
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 19
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 20
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 21
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 22
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 23
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 24
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 25
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 26
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 27
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 28
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 29
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 30
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 31
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 32
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 33
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 34
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 35
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 36
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 37
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 38
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 39
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 40
+            - type: custom:button-card
+              template: kn_cal_cell
+              variables:
+                idx: 41
+        - type: conditional
+          conditions:
+          - condition: state
+            entity: input_boolean.kidsnote_month_picker
+            state: 'on'
+          card:
+            type: grid
+            columns: 3
+            square: false
+            cards:
+            - type: custom:button-card
+              template: kn_month_cell
+              variables:
+                m: 1
+            - type: custom:button-card
+              template: kn_month_cell
+              variables:
+                m: 2
+            - type: custom:button-card
+              template: kn_month_cell
+              variables:
+                m: 3
+            - type: custom:button-card
+              template: kn_month_cell
+              variables:
+                m: 4
+            - type: custom:button-card
+              template: kn_month_cell
+              variables:
+                m: 5
+            - type: custom:button-card
+              template: kn_month_cell
+              variables:
+                m: 6
+            - type: custom:button-card
+              template: kn_month_cell
+              variables:
+                m: 7
+            - type: custom:button-card
+              template: kn_month_cell
+              variables:
+                m: 8
+            - type: custom:button-card
+              template: kn_month_cell
+              variables:
+                m: 9
+            - type: custom:button-card
+              template: kn_month_cell
+              variables:
+                m: 10
+            - type: custom:button-card
+              template: kn_month_cell
+              variables:
+                m: 11
+            - type: custom:button-card
+              template: kn_month_cell
+              variables:
+                m: 12
         - type: grid
           columns: 1
           square: false

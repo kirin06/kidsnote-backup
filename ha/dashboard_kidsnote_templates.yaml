@@ -1,0 +1,177 @@
+# 키즈노트 달력 칸 / 12개월 칸 템플릿 — 대시보드 원본 YAML 맨 위 button_card_templates: 아래에 붙여넣기
+# (다른 템플릿 tile:, hero: 등과 같은 들여쓰기 = 공백 2칸)
+  kn_cal_cell:
+    entity: sensor.kidsnote_summary
+    show_name: false
+    show_icon: false
+    show_state: false
+    variables:
+      idx: 0
+    tap_action:
+      action: perform-action
+      perform_action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.kidsnote_date
+      data:
+        date: |
+          [[[
+            const cal = (entity && entity.attributes.calendar) || {};
+            const rep = (entity && entity.attributes.report) || {};
+            const now = new Date();
+            const [y, m] = (cal.month || `${now.getFullYear()}-${now.getMonth() + 1}`).split('-').map(Number);
+            const first = new Date(y, m - 1, 1);
+            const dim = new Date(y, m, 0).getDate();
+            const dt = new Date(y, m - 1, 1 - first.getDay() + variables.idx);
+            const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+            const inMonth = dt.getMonth() === m - 1;
+            const rows = Math.ceil((first.getDay() + dim) / 7);
+            const row = Math.floor(variables.idx / 7), col = variables.idx % 7;
+            const lastRow = row === rows - 1;
+            const hidden = row >= rows;
+            return key;
+          ]]]
+    hold_action:
+      action: none
+    custom_fields:
+      d: |
+        [[[
+          const cal = (entity && entity.attributes.calendar) || {};
+          const rep = (entity && entity.attributes.report) || {};
+          const now = new Date();
+          const [y, m] = (cal.month || `${now.getFullYear()}-${now.getMonth() + 1}`).split('-').map(Number);
+          const first = new Date(y, m - 1, 1);
+          const dim = new Date(y, m, 0).getDate();
+          const dt = new Date(y, m - 1, 1 - first.getDay() + variables.idx);
+          const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+          const inMonth = dt.getMonth() === m - 1;
+          const rows = Math.ceil((first.getDay() + dim) / 7);
+          const row = Math.floor(variables.idx / 7), col = variables.idx % 7;
+          const lastRow = row === rows - 1;
+          const hidden = row >= rows;
+
+          if (!inMonth) return '';
+          const info = (cal.days || {})[key];
+          const sel = key === rep.selected;
+          const isToday = key === cal.today;
+          const sun = dt.getDay() === 0;
+          const fg = sel ? '#fff' : (isToday ? '#E9806E' : (sun ? '#E9806E' : '#252525'));
+          const dot = `<span style="display:block;width:5px;height:5px;border-radius:50%;margin-top:2px;
+              background:${info ? (info.photos ? '#E9806E' : '#B9B7B2') : 'transparent'};"></span>`;
+          return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
+              <span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;
+                  background:${sel ? '#E9806E' : 'transparent'};font-size:15px;font-weight:${sel || isToday ? 700 : 400};
+                  color:${fg};">${dt.getDate()}</span>${dot}</div>`;
+        ]]]
+    styles:
+      card:
+      - background: '#FFFFFF'
+      - box-shadow: none
+      - border: none
+      - padding: '0'
+      - cursor: pointer
+      - height: "[[[\n  const cal = (entity && entity.attributes.calendar) || {};\n  const rep = (entity && entity.attributes.report)\
+          \ || {};\n  const now = new Date();\n  const [y, m] = (cal.month || `${now.getFullYear()}-${now.getMonth() + 1}`).split('-').map(Number);\n\
+          \  const first = new Date(y, m - 1, 1);\n  const dim = new Date(y, m, 0).getDate();\n  const dt = new Date(y, m -\
+          \ 1, 1 - first.getDay() + variables.idx);\n  const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2,\
+          \ '0')}-${String(dt.getDate()).padStart(2, '0')}`;\n  const inMonth = dt.getMonth() === m - 1;\n  const rows = Math.ceil((first.getDay()\
+          \ + dim) / 7);\n  const row = Math.floor(variables.idx / 7), col = variables.idx % 7;\n  const lastRow = row === rows\
+          \ - 1;\n  const hidden = row >= rows;\n  return lastRow ? '50px' : '42px';\n]]]"
+      - padding-bottom: "[[[\n  const cal = (entity && entity.attributes.calendar) || {};\n  const rep = (entity && entity.attributes.report)\
+          \ || {};\n  const now = new Date();\n  const [y, m] = (cal.month || `${now.getFullYear()}-${now.getMonth() + 1}`).split('-').map(Number);\n\
+          \  const first = new Date(y, m - 1, 1);\n  const dim = new Date(y, m, 0).getDate();\n  const dt = new Date(y, m -\
+          \ 1, 1 - first.getDay() + variables.idx);\n  const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2,\
+          \ '0')}-${String(dt.getDate()).padStart(2, '0')}`;\n  const inMonth = dt.getMonth() === m - 1;\n  const rows = Math.ceil((first.getDay()\
+          \ + dim) / 7);\n  const row = Math.floor(variables.idx / 7), col = variables.idx % 7;\n  const lastRow = row === rows\
+          \ - 1;\n  const hidden = row >= rows;\n  return lastRow ? '8px' : '0';\n]]]"
+      - border-radius: "[[[\n  const cal = (entity && entity.attributes.calendar) || {};\n  const rep = (entity && entity.attributes.report)\
+          \ || {};\n  const now = new Date();\n  const [y, m] = (cal.month || `${now.getFullYear()}-${now.getMonth() + 1}`).split('-').map(Number);\n\
+          \  const first = new Date(y, m - 1, 1);\n  const dim = new Date(y, m, 0).getDate();\n  const dt = new Date(y, m -\
+          \ 1, 1 - first.getDay() + variables.idx);\n  const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2,\
+          \ '0')}-${String(dt.getDate()).padStart(2, '0')}`;\n  const inMonth = dt.getMonth() === m - 1;\n  const rows = Math.ceil((first.getDay()\
+          \ + dim) / 7);\n  const row = Math.floor(variables.idx / 7), col = variables.idx % 7;\n  const lastRow = row === rows\
+          \ - 1;\n  const hidden = row >= rows;\n  return lastRow && col === 0 ? '0 0 0 20px' : (lastRow && col === 6 ? '0 0\
+          \ 20px 0' : '0');\n]]]"
+      - pointer-events: "[[[\n  const cal = (entity && entity.attributes.calendar) || {};\n  const rep = (entity && entity.attributes.report)\
+          \ || {};\n  const now = new Date();\n  const [y, m] = (cal.month || `${now.getFullYear()}-${now.getMonth() + 1}`).split('-').map(Number);\n\
+          \  const first = new Date(y, m - 1, 1);\n  const dim = new Date(y, m, 0).getDate();\n  const dt = new Date(y, m -\
+          \ 1, 1 - first.getDay() + variables.idx);\n  const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2,\
+          \ '0')}-${String(dt.getDate()).padStart(2, '0')}`;\n  const inMonth = dt.getMonth() === m - 1;\n  const rows = Math.ceil((first.getDay()\
+          \ + dim) / 7);\n  const row = Math.floor(variables.idx / 7), col = variables.idx % 7;\n  const lastRow = row === rows\
+          \ - 1;\n  const hidden = row >= rows;\n  return inMonth ? 'auto' : 'none';\n]]]"
+      - display: "[[[\n  const cal = (entity && entity.attributes.calendar) || {};\n  const rep = (entity && entity.attributes.report)\
+          \ || {};\n  const now = new Date();\n  const [y, m] = (cal.month || `${now.getFullYear()}-${now.getMonth() + 1}`).split('-').map(Number);\n\
+          \  const first = new Date(y, m - 1, 1);\n  const dim = new Date(y, m, 0).getDate();\n  const dt = new Date(y, m -\
+          \ 1, 1 - first.getDay() + variables.idx);\n  const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2,\
+          \ '0')}-${String(dt.getDate()).padStart(2, '0')}`;\n  const inMonth = dt.getMonth() === m - 1;\n  const rows = Math.ceil((first.getDay()\
+          \ + dim) / 7);\n  const row = Math.floor(variables.idx / 7), col = variables.idx % 7;\n  const lastRow = row === rows\
+          \ - 1;\n  const hidden = row >= rows;\n  return hidden ? 'none' : 'block';\n]]]"
+      grid:
+      - grid-template-areas: '"d"'
+      - grid-template-columns: 1fr
+      - grid-template-rows: 1fr
+      custom_fields:
+        d:
+        - justify-self: center
+        - align-self: center
+  kn_month_cell:
+    entity: sensor.kidsnote_summary
+    triggers_update:
+    - input_number.kidsnote_picker_year
+    show_name: false
+    show_icon: false
+    show_state: false
+    variables:
+      m: 1
+    tap_action:
+      action: perform-action
+      perform_action: script.kidsnote_pick_month
+      data:
+        month: '[[[ return variables.m; ]]]'
+    hold_action:
+      action: none
+    custom_fields:
+      d: |
+        [[[
+          const cal = (entity && entity.attributes.calendar) || {};
+          const py = states['input_number.kidsnote_picker_year'];
+          const year = py ? Math.round(Number(py.state)) : new Date().getFullYear();
+          const [cy, cm] = (cal.month || '').split('-').map(Number);
+          const [ty, tm] = (cal.today || '').split('-').map(Number);
+          const sel = year === cy && variables.m === cm;
+          const isNow = year === ty && variables.m === tm;
+          const lastRow = variables.m >= 10;
+
+          return `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:64px;height:34px;
+              padding:0 10px;border-radius:999px;background:${sel ? '#E9806E' : 'transparent'};
+              font-size:15px;font-weight:${sel || isNow ? 700 : 500};color:${sel ? '#fff' : (isNow ? '#E9806E' : '#252525')};">${variables.m}월</span>`;
+        ]]]
+    styles:
+      card:
+      - background: '#FFFFFF'
+      - box-shadow: none
+      - border: none
+      - padding: '0'
+      - cursor: pointer
+      - height: "[[[\n  const cal = (entity && entity.attributes.calendar) || {};\n  const py = states['input_number.kidsnote_picker_year'];\n\
+          \  const year = py ? Math.round(Number(py.state)) : new Date().getFullYear();\n  const [cy, cm] = (cal.month || '').split('-').map(Number);\n\
+          \  const [ty, tm] = (cal.today || '').split('-').map(Number);\n  const sel = year === cy && variables.m === cm;\n\
+          \  const isNow = year === ty && variables.m === tm;\n  const lastRow = variables.m >= 10;\n  return lastRow ? '62px'\
+          \ : '50px';\n]]]"
+      - padding-bottom: "[[[\n  const cal = (entity && entity.attributes.calendar) || {};\n  const py = states['input_number.kidsnote_picker_year'];\n\
+          \  const year = py ? Math.round(Number(py.state)) : new Date().getFullYear();\n  const [cy, cm] = (cal.month || '').split('-').map(Number);\n\
+          \  const [ty, tm] = (cal.today || '').split('-').map(Number);\n  const sel = year === cy && variables.m === cm;\n\
+          \  const isNow = year === ty && variables.m === tm;\n  const lastRow = variables.m >= 10;\n  return lastRow ? '12px'\
+          \ : '0';\n]]]"
+      - border-radius: "[[[\n  const cal = (entity && entity.attributes.calendar) || {};\n  const py = states['input_number.kidsnote_picker_year'];\n\
+          \  const year = py ? Math.round(Number(py.state)) : new Date().getFullYear();\n  const [cy, cm] = (cal.month || '').split('-').map(Number);\n\
+          \  const [ty, tm] = (cal.today || '').split('-').map(Number);\n  const sel = year === cy && variables.m === cm;\n\
+          \  const isNow = year === ty && variables.m === tm;\n  const lastRow = variables.m >= 10;\n  return variables.m ===\
+          \ 10 ? '0 0 0 20px' : (variables.m === 12 ? '0 0 20px 0' : '0');\n]]]"
+      grid:
+      - grid-template-areas: '"d"'
+      - grid-template-columns: 1fr
+      - grid-template-rows: 1fr
+      custom_fields:
+        d:
+        - justify-self: center
+        - align-self: center
