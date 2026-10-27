@@ -3,8 +3,11 @@
 Home Assistant 만 이 서버를 읽는다. 공유기 포트포워딩/역방향 프록시에 올리지 않는다.
 
   GET  /health              살아있는지 확인
-  GET  /api/summary         대시보드용 요약 (오늘 알림장 or 최근 알림장, 공지 3개, 상태)
-  GET  /photo/<n>?page=<p>  요약에 나온 알림장 p페이지의 n번째 사진 (없으면 투명 1px)
+  GET  /api/summary?date=YYYY-MM-DD
+                            대시보드용 요약: 그날 알림장 전부(오늘인데 없으면 최근 날),
+                            그 달 달력(알림장 있는 날), 공지 3개, 상태. date 없으면 오늘
+  GET  /photo/<n>?page=<p>&date=YYYY-MM-DD
+                            그날 사진 전체 중 p페이지의 n번째 (없으면 투명 1px)
                             한 페이지 = PHOTOS_PER_PAGE 장 (기본 12)
   POST /api/run             지금 수집 (헤더 X-Run-Key 필요)
 
@@ -107,66 +110,156 @@ def _media(folder: Path) -> tuple[list[Path], int]:
     return [p for p in files if IMG_RE.match(p.name)], sum(1 for p in files if VID_RE.match(p.name))
 
 
-def pick_report(today: date) -> tuple[Path, dict[str, Any], date] | None:
-    """오늘 선생님이 쓴 알림장, 없으면 가장 최근 것. (부모가 쓴 글은 건너뜀)"""
+def _is_parent(meta: dict[str, Any]) -> bool:
+    return ((meta.get("author") or {}).get("type") or "").lower() == "parent"
+
+
+def _teacher_reports_on(d: date) -> list[tuple[Path, dict[str, Any]]]:
+    """그날 선생님이 쓴 알림장 전부, 시간 순 (폴더 이름 앞 8자리 = 날짜)."""
+    ydir = DATA / "reports" / f"{d:%Y}"
+    if not ydir.is_dir():
+        return []
+    out = []
+    for folder in sorted(ydir.glob(f"{d:%Y%m%d}_*")):
+        meta = col.read_json(folder / "report.json")
+        if meta and not _is_parent(meta):
+            out.append((folder, meta))
+    return out
+
+
+def _latest_teacher_date(before: date) -> date | None:
+    """before 이전(포함)에서 선생님 알림장이 있는 가장 최근 날짜."""
     for i, folder in enumerate(_folders_newest_first(DATA / "reports")):
-        if i > 60:
+        if i > 120:
             break
         meta = col.read_json(folder / "report.json")
-        if not meta:
-            continue
-        if ((meta.get("author") or {}).get("type") or "").lower() == "parent":
+        if not meta or _is_parent(meta):
             continue
         d = _date_of(meta, folder)
-        if d > today:  # 미래 날짜(시차 등)는 무시
-            continue
-        return folder, meta, d
+        if d <= before:
+            return d
     return None
 
 
-def build_summary() -> dict[str, Any]:
+def resolve_day(selected: date, today: date) -> tuple[date | None, list[tuple[Path, dict[str, Any]]]]:
+    """보여줄 날짜와 그날 알림장 목록.
+    오늘을 골랐는데 오늘 알림장이 없으면 가장 최근 날로 대체한다."""
+    items = _teacher_reports_on(selected)
+    if items or selected != today:
+        return (selected if items else None), items
+    d = _latest_teacher_date(today)
+    return (d, _teacher_reports_on(d)) if d else (None, [])
+
+
+def day_photos(selected: date, today: date) -> list[Path]:
+    """그날 알림장 사진 전부 (여러 건이면 시간 순으로 이어붙임)."""
+    _, items = resolve_day(selected, today)
+    out: list[Path] = []
+    for folder, _ in items:
+        out.extend(_media(folder)[0])
+    return out
+
+
+def _comments(meta: dict[str, Any]) -> list[dict[str, str]]:
+    out = []
+    for c in (meta.get("comments") or [])[-5:]:
+        body = (c.get("content") or "").strip() or ("[이모티콘]" if c.get("emoticon_content") else "")
+        out.append({"author": c.get("author_name") or (c.get("author") or {}).get("name") or "",
+                    "type": (c.get("author") or {}).get("type") or "",
+                    "text": body[:300]})
+    return out
+
+
+def _time_label(meta: dict[str, Any]) -> str:
+    dt = col._parse_dt(meta.get("created"))
+    return f"{dt:%H:%M}" if dt else ""
+
+
+def build_report(selected: date, today: date) -> dict[str, Any]:
+    d, items = resolve_day(selected, today)
+    entries, photos, videos, ids = [], 0, 0, []
+    for folder, meta in items:
+        imgs, n_vid = _media(folder)
+        photos += len(imgs)
+        videos += n_vid
+        ids.append(str(meta.get("id")))
+        entries.append({
+            "id": meta.get("id"),
+            "time": _time_label(meta),
+            "author": _author(meta),
+            "text": (meta.get("content") or meta.get("body") or "").strip()[:4000],
+            "life": _life(meta),
+            "photo_count": len(imgs),
+            "video_count": n_vid,
+            "comments": _comments(meta),
+        })
+    is_today = selected == today
+    fallback = bool(d) and d != selected
+    if not d:
+        line = "아직 받은 알림장이 없어요." if is_today else "이날은 알림장이 없어요."
+    elif not fallback:
+        line = ""
+    elif d == today - timedelta(days=1):
+        line = "오늘 자료가 없어 어제 알림장을 보여드려요"
+    else:
+        line = f"오늘 자료가 없어 {d.month}월 {d.day}일 알림장을 보여드려요"
+    shown = d or selected
+    return {
+        "selected": selected.isoformat(),
+        "is_today": is_today,
+        "date": shown.isoformat(),
+        "date_label": _label(shown),
+        "has_report": bool(items),
+        "is_fallback": fallback,
+        "fallback_line": line,
+        "items": entries,
+        "count": len(entries),
+        "photo_count": photos,
+        "video_count": videos,
+        # HA 이미지 엔티티 캐시 갱신용 (날짜·글·사진 수가 바뀌면 값이 바뀜)
+        "version": f"{selected:%Y%m%d}-{'_'.join(ids) or '0'}-{photos}",
+        # 대시보드 사진 페이지 넘기기용
+        "per_page": PER_PAGE,
+        "page_count": max(1, -(-photos // PER_PAGE)),
+    }
+
+
+def build_calendar(month_of: date, today: date) -> dict[str, Any]:
+    """그 달에 알림장이 있는 날 {날짜: {count, photos}}"""
+    days: dict[str, dict[str, int]] = {}
+    ydir = DATA / "reports" / f"{month_of:%Y}"
+    if ydir.is_dir():
+        for folder in sorted(ydir.glob(f"{month_of:%Y%m}*_*")):
+            meta = col.read_json(folder / "report.json")
+            if not meta or _is_parent(meta):
+                continue
+            d = _date_of(meta, folder)
+            k = d.isoformat()
+            e = days.setdefault(k, {"count": 0, "photos": 0})
+            e["count"] += 1
+            e["photos"] += len(_media(folder)[0])
+    return {"month": f"{month_of:%Y-%m}", "today": today.isoformat(), "days": days}
+
+
+def _parse_date(raw: str | None, today: date) -> date:
+    try:
+        return datetime.strptime((raw or "")[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return today
+
+
+def build_summary(selected_raw: str | None = None) -> dict[str, Any]:
     now = datetime.now(KST)
     today = now.date()
     st = col.read_json(DATA / "state.json") or {}
     running = col.is_running()
+    selected = _parse_date(selected_raw, today)
 
-    report: dict[str, Any] | None = None
-    picked = pick_report(today)
-    if picked:
-        folder, meta, d = picked
-        imgs, n_vid = _media(folder)
-        text = (meta.get("content") or meta.get("body") or "").strip()
-        comments = []
-        for c in (meta.get("comments") or [])[-5:]:
-            body = (c.get("content") or "").strip() or ("[이모티콘]" if c.get("emoticon_content") else "")
-            comments.append({"author": c.get("author_name") or (c.get("author") or {}).get("name") or "",
-                             "type": (c.get("author") or {}).get("type") or "",
-                             "text": body[:300]})
-        fallback = d != today
-        if not fallback:
-            line = ""
-        elif d == today - timedelta(days=1):
-            line = "오늘 자료가 없어 어제 알림장을 보여드려요"
-        else:
-            line = f"오늘 자료가 없어 {d.month}월 {d.day}일 알림장을 보여드려요"
-        report = {
-            "id": meta.get("id"),
-            "date": d.isoformat(),
-            "date_label": _label(d),
-            "is_fallback": fallback,
-            "fallback_line": line,
-            "author": _author(meta),
-            "text": text[:4000],
-            "life": _life(meta),
-            "photo_count": len(imgs),
-            "video_count": n_vid,
-            "comments": comments,
-            # HA 이미지 엔티티 캐시 갱신용 (글이나 사진 수가 바뀌면 값이 바뀜)
-            "version": f"{meta.get('id')}-{len(imgs)}",
-            # 대시보드 사진 페이지 넘기기용
-            "per_page": PER_PAGE,
-            "page_count": max(1, -(-len(imgs) // PER_PAGE)),
-        }
+    report = build_report(selected, today)
+    today_rep = report if selected == today else build_report(today, today)
+    today_info = {"has_report": today_rep["has_report"] and not today_rep["is_fallback"],
+                  "photo_count": today_rep["photo_count"] if not today_rep["is_fallback"] else 0,
+                  "latest_label": today_rep["date_label"]}
 
     notices = []
     for folder in _folders_newest_first(DATA / "notices"):
@@ -187,6 +280,8 @@ def build_summary() -> dict[str, Any]:
         "status": status,
         "generated_at": now.isoformat(timespec="seconds"),
         "report": report,
+        "today": today_info,
+        "calendar": build_calendar(selected, today),
         "notices": notices,
         "run": {
             "progress": st.get("progress", "") if running else "",
@@ -236,16 +331,21 @@ def scheduler() -> None:
 # ---------------------------------------------------------------------------
 # HTTP
 # ---------------------------------------------------------------------------
-_cache: dict[str, Any] = {"t": 0.0, "body": b""}
+_cache: dict[str, tuple[float, bytes]] = {}
 _cache_lock = threading.Lock()
 
 
-def summary_bytes() -> bytes:
+def summary_bytes(selected: str | None) -> bytes:
+    key = (selected or "")[:10]
     with _cache_lock:
-        if time.monotonic() - _cache["t"] > 10 or col.is_running():
-            _cache["body"] = json.dumps(build_summary(), ensure_ascii=False).encode("utf-8")
-            _cache["t"] = time.monotonic()
-        return _cache["body"]
+        hit = _cache.get(key)
+        if hit and time.monotonic() - hit[0] <= 10 and not col.is_running():
+            return hit[1]
+        body = json.dumps(build_summary(selected), ensure_ascii=False).encode("utf-8")
+        if len(_cache) > 50:
+            _cache.clear()
+        _cache[key] = (time.monotonic(), body)
+        return body
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -268,16 +368,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         path = self.path.split("?", 1)[0].rstrip("/") or "/"
+        qs = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
         try:
             if path == "/health":
                 self._send(200, b"ok", "text/plain")
             elif path == "/api/summary":
-                self._send(200, summary_bytes())
+                self._send(200, summary_bytes((qs.get("date") or [""])[0]))
             elif (m := re.fullmatch(r"/photo/(\d{1,2})", path)):
-                qs = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
                 page = (qs.get("page") or ["1"])[0]
                 page = int(page) if page.isdigit() and int(page) > 0 else 1
-                self._photo((page - 1) * PER_PAGE + int(m.group(1)))
+                self._photo((page - 1) * PER_PAGE + int(m.group(1)), (qs.get("date") or [""])[0])
             else:
                 self._json(404, {"error": "not found"})
         except Exception as e:  # noqa: BLE001
@@ -286,16 +386,15 @@ class Handler(BaseHTTPRequestHandler):
 
     do_HEAD = do_GET
 
-    def _photo(self, n: int) -> None:
-        """n = 알림장 안에서 몇 번째 사진인지 (페이지 반영 후, 1부터)"""
-        picked = pick_report(datetime.now(KST).date())
-        if picked:
-            imgs, _ = _media(picked[0])
-            if 1 <= n <= len(imgs):
-                p = imgs[n - 1]
-                ctype = mimetypes.guess_type(p.name)[0] or "image/jpeg"
-                self._send(200, p.read_bytes(), ctype)
-                return
+    def _photo(self, n: int, selected_raw: str = "") -> None:
+        """n = 그날 사진 전체에서 몇 번째인지 (페이지 반영 후, 1부터)"""
+        today = datetime.now(KST).date()
+        imgs = day_photos(_parse_date(selected_raw, today), today)
+        if 1 <= n <= len(imgs):
+            p = imgs[n - 1]
+            ctype = mimetypes.guess_type(p.name)[0] or "image/jpeg"
+            self._send(200, p.read_bytes(), ctype)
+            return
         self._send(200, BLANK_PNG, "image/png")
 
     def do_POST(self) -> None:  # noqa: N802
